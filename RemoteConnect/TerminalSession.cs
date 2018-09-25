@@ -1,36 +1,56 @@
-﻿using System.Security;
+﻿using System;
 
 namespace RemoteConnect
 {
-    internal sealed class TerminalSession : ConnectionProperties
+    internal sealed class TerminalSession : Connection
     {
-        private string TerminalCmd
+        #region Properties
+        private string Executable
+        {
+            get
+            {
+                return Environment.ExpandEnvironmentVariables(@"%SystemRoot%\system32\cmd.exe");
+            }
+        }
+        private string CmdArgs
         {
             get
             {
                 return "plink -L " + Host + " " + Credentials.Username + " -pw " + Credentials.DecryptedPassword;
             }
         }
+        #endregion
 
-        internal TerminalSession(string host, string username, SecureString password, Protocol protocol, string overrideFileName = @"C:\Windows\System32\cmd") 
-            : base(host, username, password, protocol, overrideFileName) { }
+        #region Constructors
+        internal TerminalSession(string host, Credentials credentials, bool keepAlive, Protocol protocol = Protocol.RDP)
+            : base(host, credentials, keepAlive, protocol)
+        {
+            ConnectionProcess.StartInfo.FileName = Executable;
+            ConnectionProcess.StartInfo.Arguments = CmdArgs;
+        }
+        #endregion
 
-        internal override void Connect(bool autoDispose = false)
+        #region Override Methods
+        internal override void Connect()
         {
             ConnectionProcess.Start();
-            ConnectionProcess.StandardInput.WriteLine(TerminalCmd);
+            ConnectionProcess.StandardInput.WriteLine(CmdArgs);
         }
 
         public override void Dispose()
         {
-            ConnectionProcess.WaitForExit();
-            ConnectionProcess.StandardInput.WriteLine("logout");
-
-            if (ConnectionProcess.HasExited)
+            if (!KeepAlive)
             {
-                ConnectionProcess.Close();
-                ConnectionProcess.Dispose();
+                ConnectionProcess.WaitForExit();
+                ConnectionProcess.StandardInput.WriteLine("logout");
+
+                if (ConnectionProcess.HasExited)
+                {
+                    ConnectionProcess.Close();
+                    ConnectionProcess.Dispose();
+                }
             }
         }
+        #endregion
     }
 }

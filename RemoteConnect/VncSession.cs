@@ -1,24 +1,42 @@
 ﻿using System;
-using System.Security;
 
 namespace RemoteConnect
 {
-    internal sealed class VncSession : ConnectionProperties, IDisposable
+    internal sealed class VncSession : Connection
     {
-        internal VncSession(string host, string username, SecureString password, string overrideFileName = @"")
-            : base(host, username, password, Protocol.VNC, overrideFileName)
+        #region Properties
+        private string Executable
         {
-
+            get
+            {
+                return Environment.ExpandEnvironmentVariables(@"");
+            }
         }
+        private string CmdArgs
+        {
+            get
+            {
+                return "";
+            }
+        }
+        #endregion
 
-        internal override void Connect(bool autoDispose = false)
+        #region Constructors
+        internal VncSession(string host, Credentials credentials, bool keepAlive, Protocol protocol = Protocol.RDP)
+            : base(host, credentials, keepAlive, protocol)
+        {
+            ConnectionProcess.StartInfo.FileName = Executable;
+            ConnectionProcess.StartInfo.Arguments = CmdArgs;
+        }
+        #endregion
+
+        #region Override Methods
+        internal override void Connect()
         {
             
         }
 
-        public override void Dispose()
-        {
-            
-        }
+        //public override void Dispose() { }
+        #endregion
     }
 }

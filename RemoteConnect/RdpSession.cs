@@ -1,73 +1,85 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Security;
 using System.Text.RegularExpressions;
 
 namespace RemoteConnect
 {
-    internal sealed class RdpSession : ConnectionProperties
+    internal sealed class RdpSession : Connection
     {
-        internal RdpSession(string host, string username, SecureString password, string overrideFileName = @"%SystemRoot%\system32\cmdkey.exe")
-            : base(host, username, password, Protocol.RDP, overrideFileName)
+        #region Properties
+        private string Executable
         {
-            if (!host.EndsWith(".LUKE.int") && !Regex.IsMatch(host, @"[\d\d?\d?.]{3}\d\d?\d?"))
+            get
             {
-                if (host.EndsWith(".LUKE"))
-                {
-                    host += ".int";
-                }
-                else if (host.Contains("."))
-                {
-                    throw new Exception("Invalid domain entered or host name is malformed.");
-                }
-                else
-                {
-                    host += ".LUKE.int";
-                }
+                return Environment.ExpandEnvironmentVariables(@"%SystemRoot%\system32\cmdkey.exe");
             }
+        }
+        private string CmdArgs
+        {
+            get
+            {
+                return $@"/generic:TERMSRV/{Host} /user:{Credentials.Username} /pass:{Credentials.DecryptedPassword}";
+            }
+        }
+        #endregion
+
+        #region Constructors
+        internal RdpSession(string host, Credentials credentials, bool keepAlive, Protocol protocol = Protocol.RDP)
+            : base(host, credentials, keepAlive, protocol)
+        {
+            ConnectionProcess.StartInfo.FileName = Executable;
+            ConnectionProcess.StartInfo.Arguments = CmdArgs;
+            
             Host = host;
         }
+        #endregion
 
-        internal override void Connect(bool autoDispose = false)
+        #region Override Methods
+        internal override void Connect()
         {
             ConnectionProcess.Start();
             ConnectionProcess.WaitForExit();
             if (!ConnectionProcess.StandardOutput.ReadToEnd().Contains($@"TERMSRV/{Host}"))
             {
-                this.Host = Host;
                 ConnectionProcess = new Process
                 {
                     StartInfo =
                     {
-                        FileName = Environment.ExpandEnvironmentVariables(@"%SystemRoot%\system32\cmdkey.exe"),
-                        Arguments = $@"/generic:TERMSRV/{Host} /user:{Credentials.Username} /pass:{Credentials.DecryptedPassword}",
+                        FileName = Executable,
+                        Arguments = CmdArgs,
                         WindowStyle = ProcessWindowStyle.Hidden
                     }
                 };
                 ConnectionProcess.Start();
             }
-
-            if (autoDispose)
-            {
-                Dispose();
-            }
         }
 
-        public override void Dispose()
+        public override void Dispose() 
         {
             if (Host != null)
             {
-                var cmdkey = new Process
+                Process cmdkey = new Process
                 {
                     StartInfo =
-            {
-                FileName = Environment.ExpandEnvironmentVariables(@"%SystemRoot%\system32\cmdkey.exe"),
-                Arguments = $@"/delete:TERMSRV/{Host}",
-                WindowStyle = ProcessWindowStyle.Hidden
-            }
+                    {
+                        FileName = Executable,
+                        Arguments = $@"/delete:TERMSRV/{Host}",
+                        WindowStyle = ProcessWindowStyle.Hidden
+                    }
                 };
                 cmdkey.Start();
+                cmdkey.Dispose();
+            }
+
+            if (!KeepAlive)
+            {
+                if (ConnectionProcess.HasExited)
+                {
+                    ConnectionProcess.Close();
+                    ConnectionProcess.Dispose();
+                }
             }
         }
+        #endregion
     }
 }

@@ -5,33 +5,25 @@ using System.Security;
 
 namespace RemoteConnect
 {
-    internal class CredentialSet
+    internal class Credentials
     {
-        internal string Username { get; private set; }
-        internal SecureString Password { get; private set; }
+        #region Properties
+        internal string Username { get; set; }
+        internal SecureString Password { get; set; }
         internal bool UseCurrentUser { get; private set; }
-        internal string DecryptedPassword
-        {
-            get
-            {
-                return DecryptPassword();
-            }
-        }
+        internal string DecryptedPassword { get { return DecryptPassword(); } }
+        #endregion
 
-        internal CredentialSet(string username, SecureString password)
-        {
-            Username = username;
-            Password = password;
-            UseCurrentUser = false;
-        }
-
-        internal CredentialSet(bool useCurrentUser = true)
-        {
+        #region Constructors
+        internal Credentials(bool useCurrentUser = true)
+        {            
             Username = null;
             Password = null;
             UseCurrentUser = true;
         }
+        #endregion
 
+        #region Instance Methods
         internal bool ValidateCredentials()
         {
             using (PrincipalContext pc = new PrincipalContext(ContextType.Domain))
@@ -39,7 +31,9 @@ namespace RemoteConnect
                return pc.ValidateCredentials(Username, DecryptedPassword);
             }
         }
+        #endregion
 
+        #region Private Methods
         private string DecryptPassword()
         {
             IntPtr unmanagedString = IntPtr.Zero;
@@ -57,5 +51,6 @@ namespace RemoteConnect
                 Marshal.ZeroFreeGlobalAllocUnicode(unmanagedString);
             }
         }
+        #endregion
     }
 }
